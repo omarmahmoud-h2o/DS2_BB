@@ -1,0 +1,282 @@
+"""Model backends for vLLM, MLX, OpenAI-compatible APIs, or Anthropic."""
+
+import config
+import requests
+
+
+
+try:
+    from mlx_lm import load, generate
+    MLX_AVAILABLE = True
+except ImportError:
+    MLX_AVAILABLE = False
+try:
+    from vllm import LLM, SamplingParams
+    VLLM_AVAILABLE = True
+except ImportError:
+    VLLM_AVAILABLE = False
+
+
+
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+
+
+    
+class MLXBackend:
+    """Native Apple Silicon backend using mlx-lm."""
+
+    def __init__(self, model_path, mlx_config=None):
+        self.model_path = model_path
+        self.mlx_config = mlx_config or {}
+        self.model = None
+        self.tokenizer = None
+
+    def setup(self):
+        if not MLX_AVAILABLE:
+            print(
+                "mlx-lm is not installed. "
+                "Install it with: pip install mlx mlx-lm"
+            )
+            return False, ""
+
+        print(f"Loading MLX model: {self.model_path}")
+
+        self.model, self.tokenizer = load(self.model_path)
+
+        return True, self.model_path
+
+    def generate(self, prompt, max_tokens, temperature):
+        messages = [{"role": "user", "content": prompt}]
+        templated = self.tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
+
+        # mlx_lm.generate handles token generation directly.
+        text = generate(
+            self.model,
+            self.tokenizer,
+            prompt=templated,
+            max_tokens=max_tokens,
+            verbose=False,
+        )
+
+        if text is None:
+            return None
+
+        text = text.strip()
+        return text or None
+
+
+class VLLMDirectBackend:
+    def __init__(self, model_path, vllm_config):
+        self.model_path = model_path
+        self.vllm_config = vllm_config
+        self.llm = None
+
+    def setup(self):
+        if not VLLM_AVAILABLE:
+            return False, ""
+
+        self.llm = LLM(
+            model=self.model_path,
+            max_model_len=self.vllm_config.get("max_model_len", 4096),
+            tensor_parallel_size=self.vllm_config.get("tensor_parallel_size", 1),
+            gpu_memory_utilization=self.vllm_config.get(
+                "gpu_memory_utilization", 0.8
+            ),
+            trust_remote_code=self.vllm_config.get(
+                "trust_remote_code", True
+            ),
+            dtype=self.vllm_config.get("dtype", "bfloat16"),
+            enforce_eager=self.vllm_config.get("enforce_eager", False),
+        )
+
+        return True, self.model_path
+
+    def generate(self, prompt, max_tokens, temperature):
+        params = SamplingParams(
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=config.TOP_P,
+            stop=config.STOP_TOKENS,
+        )
+
+        out = self.llm.generate([prompt], params)
+        text = out[0].outputs[0].text.strip()
+
+        return text or None
+
+
+class APIBackend:
+    def __init__(self, api_base, api_key, model_name):
+        self.api_base = api_base
+        self.api_key = api_key
+        self.model_name = model_name
+
+    def setup(self):
+        resp = requests.get(
+            f"{self.api_base}/models",
+            timeout=120,
+        )
+        resp.raise_for_status()
+
+        models = [
+            m["id"]
+            for m in resp.json().get("data", [])
+        ]
+
+        if self.model_name in models:
+            return True, self.model_name
+
+        if models:
+            self.model_name = models[0]
+            return True, self.model_name
+
+        return False, ""
+
+    def generate(self, prompt, max_tokens, temperature):
+        resp = requests.post(
+            f"{self.api_base}/chat/completions",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            },
+            json={
+                "model": self.model_name,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "top_p": config.TOP_P,
+                "stop": config.STOP_TOKENS,
+                "stream": False,
+            },
+            timeout=config.REQUEST_TIMEOUT,
+        )
+
+        resp.raise_for_status()
+
+        text = (
+            resp.json()["choices"][0]["message"]["content"]
+            .strip()
+        )
+
+        return text or None
+
+
+class AnthropicBackend:
+    THINKING_HEADROOM = 4096
+
+    def __init__(self, model_name, api_key):
+        self.model_name = model_name
+        self.api_key = api_key
+        self.client = None
+        self.supports_temperature = True
+
+    def setup(self):
+        if not ANTHROPIC_AVAILABLE:
+            return False, ""
+
+        self.client = (
+            anthropic.Anthropic(api_key=self.api_key)
+            if self.api_key
+            else anthropic.Anthropic()
+        )
+
+        return True, self.model_name
+
+    def generate(self, prompt, max_tokens, temperature):
+        kwargs = {
+            "model": self.model_name,
+            "max_tokens": min(
+                16000,
+                max_tokens + self.THINKING_HEADROOM,
+            ),
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+        }
+
+        if self.supports_temperature:
+            kwargs["temperature"] = temperature
+
+        try:
+            resp = self.client.messages.create(**kwargs)
+        except anthropic.BadRequestError as e:
+            if not (
+                self.supports_temperature
+                and "temperature" in str(e)
+            ):
+                raise
+
+            self.supports_temperature = False
+            kwargs.pop("temperature")
+
+            resp = self.client.messages.create(**kwargs)
+
+        text = "".join(
+            b.text
+            for b in resp.content
+            if b.type == "text"
+        ).strip()
+
+        return text or None
+
+
+# ── Public API ───────────────────────────────────────────────────
+
+_backend = None
+
+
+def setup_model_backend():
+    global _backend
+
+    bc = config.get_backend_config()
+
+    if bc["type"] == "mlx":
+        _backend = MLXBackend(
+            bc["model_path"],
+            bc.get("mlx_config", {}),
+        )
+
+    elif bc["type"] == "vllm_direct":
+        _backend = VLLMDirectBackend(
+            bc["model_path"],
+            bc["vllm_config"],
+        )
+
+    elif bc["type"] == "anthropic":
+        _backend = AnthropicBackend(
+            bc["model_name"],
+            bc["api_key"],
+        )
+
+    else:
+        _backend = APIBackend(
+            bc["api_base"],
+            bc["api_key"],
+            bc["model_name"],
+        )
+
+    return _backend.setup()
+
+
+def call_model(prompt, max_tokens, temperature):
+    return _backend.generate(
+        prompt,
+        max_tokens,
+        temperature,
+    )
