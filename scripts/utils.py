@@ -1,21 +1,28 @@
-"""Shared utilities: LLM JSON extraction and conversation schema validation."""
+"""Shared utilities: LLM JSON extraction and FAG record schema validation."""
 
 import json
 import os
 import re
 
-VALID_COMPLIANCE_STATUSES = {"COMPLIANT", "NON_COMPLIANT", "BORDERLINE"}
-VALID_SEVERITIES          = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
-VALID_DIFFICULTIES        = {"EASY", "MEDIUM", "HARD", "BORDERLINE"}
+import config
+from policy_categories import derive_policy_categories, expected_breach, unexplained_breach
+
+VALID_SEVERITIES     = {"MEDIUM", "HIGH", "CRITICAL"}
+VALID_DIFFICULTIES   = {"EASY", "MEDIUM", "HARD"}
+VALID_ADVICE_TIERS   = set(config.ADVICE_TIERS)
+VALID_PRODUCT_SCOPES = {"corps_act", "non_corps_act"}
 
 REQUIRED_LLM_FIELDS = [
     "customer_intent", "messages", "problematic_turns",
     "problematic_spans", "reasoning_summary", "expected_ai_behavior",
 ]
 
+_BOOL_FIELDS = ["financial_advice_breach", "is_corps_question",
+                "denial_present", "contestable"]
+
 
 def format_conversation_id(index):
-    return f"SYN-BANK-{index:06d}"
+    return f"SYN-FAG-{index:06d}"
 
 
 def count_existing_lines(path):
@@ -41,11 +48,8 @@ def extract_json(response):
         return None
 
 
-def validate_conversation(record, valid_risk_categories):
-    """Validate an assembled conversation record against the expected schema.
-
-    Returns (is_valid, list_of_error_strings).
-    """
+def validate_conversation(record):
+    """Validate an assembled FAG record. Returns (is_valid, list_of_errors)."""
     errors = []
 
     for field in REQUIRED_LLM_FIELDS:
@@ -54,16 +58,47 @@ def validate_conversation(record, valid_risk_categories):
     if errors:
         return False, errors
 
-    if record.get("compliance_status") not in VALID_COMPLIANCE_STATUSES:
-        errors.append(f"invalid compliance_status: {record.get('compliance_status')}")
-    if record.get("severity") not in VALID_SEVERITIES:
-        errors.append(f"invalid severity: {record.get('severity')}")
+    # ── scalar fields ────────────────────────────────────────────
+    for field in _BOOL_FIELDS:
+        if not isinstance(record.get(field), bool):
+            errors.append(f"{field} must be a bool, got {record.get(field)!r}")
+
+    breach = record.get("financial_advice_breach")
+    tier   = record.get("advice_tier")
+    scope  = record.get("product_scope")
+
+    if tier not in VALID_ADVICE_TIERS:
+        errors.append(f"invalid advice_tier: {tier}")
+    if scope not in VALID_PRODUCT_SCOPES:
+        errors.append(f"invalid product_scope: {scope}")
     if record.get("difficulty") not in VALID_DIFFICULTIES:
         errors.append(f"invalid difficulty: {record.get('difficulty')}")
-    for cat in record.get("risk_categories", []):
-        if cat not in valid_risk_categories:
-            errors.append(f"invalid risk_category: {cat}")
 
+    signals = record.get("signal_categories") or []
+    for sig in signals:
+        if sig not in config.SIGNAL_CATEGORIES:
+            errors.append(f"invalid signal_category: {sig}")
+
+    # The policy rule itself: the label must follow from tier + scope.
+    if tier in VALID_ADVICE_TIERS and scope in VALID_PRODUCT_SCOPES:
+        if breach != expected_breach(tier, scope):
+            errors.append(
+                f"label/policy mismatch: advice_tier={tier} on {scope} implies "
+                f"breach={expected_breach(tier, scope)}, record says {breach}"
+            )
+
+    # Severity is meaningful only for a breach.
+    severity = record.get("severity")
+    if breach is True and severity not in VALID_SEVERITIES:
+        errors.append(f"breach record needs a severity, got {severity!r}")
+    if breach is False and severity is not None:
+        errors.append(f"non-breach record must have severity=None, got {severity!r}")
+
+    # A Corps question is by definition about a Corps Act product.
+    if record.get("is_corps_question") and scope != "corps_act":
+        errors.append("is_corps_question=True requires product_scope=corps_act")
+
+    # ── messages ─────────────────────────────────────────────────
     messages = record.get("messages", [])
     if not isinstance(messages, list) or not messages:
         errors.append("messages must be a non-empty list")
@@ -84,16 +119,17 @@ def validate_conversation(record, valid_risk_categories):
         turns_by_number[i] = msg
         expected_role = "assistant" if expected_role == "customer" else "customer"
 
+    # ── spans ────────────────────────────────────────────────────
     problematic_turns = record.get("problematic_turns", [])
     problematic_spans = record.get("problematic_spans", [])
-    compliance_status = record.get("compliance_status")
 
-    if compliance_status == "COMPLIANT":
+    if breach is False:
         if problematic_turns or problematic_spans:
-            errors.append("COMPLIANT record must have empty problematic_turns/problematic_spans")
+            errors.append("non-breach record must have empty problematic_turns/problematic_spans")
     elif not problematic_spans:
-        errors.append(f"{compliance_status} record must have at least one problematic_span")
+        errors.append("breach record must have at least one problematic_span")
 
+    span_categories = set()
     for span in problematic_spans:
         turn_no = span.get("turn")
         msg = turns_by_number.get(turn_no)
@@ -104,11 +140,29 @@ def validate_conversation(record, valid_risk_categories):
             errors.append(f"problematic_span turn {turn_no} is not an assistant turn")
         if span.get("text", "") not in msg.get("content", ""):
             errors.append(f"problematic_span text not found verbatim in turn {turn_no}")
-        if span.get("category") not in valid_risk_categories:
-            errors.append(f"invalid problematic_span category: {span.get('category')}")
+        category = span.get("category")
+        if category not in config.SIGNAL_CATEGORIES:
+            errors.append(f"invalid problematic_span category: {category}")
+        elif category not in signals:
+            errors.append(f"span category {category} is not in the record's signal_categories")
+        span_categories.add(category)
+
+    # Every declared signal must actually be evidenced by a span.
+    if breach is True:
+        for sig in signals:
+            if sig not in span_categories:
+                errors.append(f"signal_category {sig} has no annotated span")
 
     for turn_no in problematic_turns:
         if turn_no not in turns_by_number:
             errors.append(f"problematic_turns references missing turn {turn_no}")
+
+    # ── derived policy categories ────────────────────────────────
+    if "policy_categories" in record:
+        if record["policy_categories"] != derive_policy_categories(record):
+            errors.append("policy_categories do not match derivation from signals + context")
+
+    if unexplained_breach(record):
+        errors.append("breach is not explained by any production policy category")
 
     return len(errors) == 0, errors

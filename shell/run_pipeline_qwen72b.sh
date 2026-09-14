@@ -59,4 +59,4 @@ $PY "${PROJ}/scripts/generate_conversations.py" --count "${COUNT}" \
     --max_retries "${MAX_RETRIES}" --temperature "${TEMPERATURE}"
 
 $PY "${PROJ}/scripts/validate_conversations.py" \
-    --input "${PROJ}/output_qwen/banking_compliance_conversations_qwen.jsonl"
+    --input "${PROJ}/output/vrm_fag_conversations.jsonl"

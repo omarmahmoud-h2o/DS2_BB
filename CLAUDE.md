@@ -4,68 +4,75 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-DS²-INSTRUCT generates a synthetic dataset of business-banking customer/AI-assistant conversations, labeled `COMPLIANT` / `NON_COMPLIANT` / `BORDERLINE`, for training and evaluating a financial compliance detection system. The full generation spec (topics, risk categories, realism/safety requirements, output schema, target distributions, QC checklist) lives in [Task description.md](Task%20description.md) — read it before changing prompt or sampling logic, since the code encodes its rules directly. [synthetic_conversations.jsonl](synthetic_conversations.jsonl) is a hand-authored reference sample showing the target output shape and quality bar.
+DS²-INSTRUCT generates a synthetic corpus of Australian business-banking customer/assistant conversations for training and evaluating the **Financial Advice Guardrail (FAG)**. The label is a single binary, `financial_advice_breach`.
 
-There is no test suite or build step — this is a small collection of pipeline scripts run via the shell wrappers in `shell/`.
+**Scope discipline — read this before changing anything.** In the VRM system, compliance is a *symbolic composition over guardrail outputs*, not a synonym for financial advice:
 
-## Setup
-
-```bash
-conda env create -f environment.yml
-conda activate ds2
+```
+COMPLIANT = fag_pass ∧ grounded
 ```
 
-## Running the pipeline
+The variables in that tree are the guardrail outputs; the tree nodes are the guardrails themselves. This repo supervises **one variable in it** — the FAG. Groundedness is a sibling guardrail (hallucination / factual fidelity, regulated as misleading-or-deceptive conduct) and is deliberately *not* modelled here; it also cannot be, since groundedness is only assessable against a retrieved source context and these records carry none. Do not reintroduce a `compliance_status` field — a FAG-only generator has no evidence for a compliance verdict. See [VRM_Compliance_Guardrail_Architecture.md](VRM_Compliance_Guardrail_Architecture.md).
 
-Two entry points in `shell/`, one per backend, each generating `<count>` conversations then validating them:
+Policy/taxonomy source of truth: [VRM_Compliance_Definitions_OLD.md](VRM_Compliance_Definitions_OLD.md). [Task description.md](Task%20description.md) is the **superseded** original spec (broad multi-category compliance: AML, sanctions, fraud, KYC, 7 jurisdictions); its realism/QC requirements still read across, its taxonomy and jurisdictions do not. [synthetic_conversations.jsonl](synthetic_conversations.jsonl) and `output/banking_compliance_conversations*.jsonl` are artefacts of that superseded spec and will not pass the current validator.
 
-```bash
-# Local vLLM (Qwen 72B), starts/reuses a vLLM server on localhost:8001
-bash shell/run_pipeline_qwen72b.sh <count> [--server-only] [--no-server]
+There is no test suite or build step — a small collection of pipeline scripts run via the `shell/` wrappers.
 
-# Anthropic (requires ANTHROPIC_API_KEY; optional ANTHROPIC_MODEL, defaults to claude-sonnet-5)
-export USE_ANTHROPIC=1
-bash shell/run_pipeline_anthropic.sh <count> [--max_retries N] [--temperature T] [--start_index N]
-```
+## Held-out test data — do not read
 
-Stages can also be run directly:
+`../single_turn_financial_advice.csv` and `../multi_turn_financial_advice.csv` are the user's **held-out evaluation set**. No pipeline code reads them, and neither should you. In particular, do not tune the generator's distributions to match theirs — `BREACH_RATE` is balanced 50/50 by design, and prevalence is a reweighting knob applied at readout, not baked into the corpus (same rationale as `Claude_native_approach/archive/groundedness-v1` ADR 0002). Contamination checking is [scripts/check_test_overlap.py](scripts/check_test_overlap.py), which the user runs themselves with explicit paths.
+
+## Setup and running
 
 ```bash
-python scripts/generate_conversations.py --count 200 [--output PATH] [--start_index N] [--max_retries 2] [--temperature 0.8] [--seed N]
-python scripts/validate_conversations.py --input output/banking_compliance_conversations.jsonl [--output cleaned.jsonl]
+conda env create -f environment.yml && conda activate ds2
+
+bash shell/run_pipeline_qwen72b.sh <count>          # local vLLM
+USE_ANTHROPIC=1 bash shell/run_pipeline_anthropic.sh <count>
+
+python scripts/generate_conversations.py --count 200 [--start_index N] [--max_retries 2] [--temperature 0.8] [--seed N]
+python scripts/validate_conversations.py --input output/vrm_fag_conversations.jsonl [--output cleaned.jsonl]
 ```
 
-Output: `output/banking_compliance_conversations.jsonl` — one JSON conversation record per line, appended across runs. `generate_conversations.py` auto-continues `conversation_id` numbering from however many lines already exist in the output file unless `--start_index` is given.
+Output appends to `output/vrm_fag_conversations.jsonl`; `conversation_id` (`SYN-FAG-NNNNNN`) auto-continues from existing line count unless `--start_index` is given.
 
 ## Pipeline architecture
 
-Unlike a keyword-expansion/retrieval pipeline, each conversation here is produced by a single LLM call: the *scenario metadata* (topic, jurisdiction, compliance status, severity, difficulty, risk categories, conversation length) is sampled by code first, and the LLM's only job is to write a conversation that matches that fixed recipe. This split exists because the task spec gives explicit target distributions (e.g. 40/45/15% compliant/non-compliant/borderline, risk categories "distributed broadly rather than concentrating on AML") that are far more reliable to enforce via weighted sampling than by asking the model to self-balance across many calls.
+Each conversation is one LLM call. The *scenario recipe* — scope, topic, label, tier, signals, severity, difficulty, length — is sampled by code first; the model's only job is to write prose matching that fixed recipe. Every label and context fact in the final record comes from the scenario, never from the model.
 
-1. **[scripts/scenario_sampler.py](scripts/scenario_sampler.py)** — `sample_scenario()` draws one scenario recipe: `conversation_type`/`turn_count` (from `CONVERSATION_LENGTH_BUCKETS`/`_WEIGHTS` — single_turn=2 messages, short=2-4, medium=6-8, long=10-14; always even since real conversations end on an assistant turn), `compliance_status` (weighted per `COMPLIANCE_STATUS_WEIGHTS`), then `severity`/`difficulty`/`risk_categories` conditioned on that status (e.g. BORDERLINE always pairs with `difficulty="BORDERLINE"`), plus `industry`/`business_type`/`jurisdiction`/`primary_topic`/`secondary_topics` and a `customer_stance` hint (legitimate/suspicious/confused/frustrated/ambiguous/prohibited_request/personalized_request) used only to flavor the prompt, not written to the final record.
+1. **[scripts/scenario_sampler.py](scripts/scenario_sampler.py)** — `sample_scenario()` draws `product_scope` (which also selects the topic pool), then `financial_advice_breach` (balanced per `BREACH_RATE`), then `advice_tier`/`signal_categories`/`severity` conditioned on both. `is_corps_question` is derived from scope + an advice-seeking `customer_stance`; `denial_present` from whether policy required a decline and whether the response gave one.
 
-2. **[scripts/prompts.py](scripts/prompts.py)** — `build_conversation_prompt(scenario)` renders the fixed recipe plus risk-category definitions (`config.CATEGORY_DESCRIPTIONS`) into a generation prompt instructing the model to return one JSON object with exactly: `customer_intent`, `messages`, `problematic_turns`, `problematic_spans`, `reasoning_summary`, `expected_ai_behavior`. Everything else in the final record (topic, jurisdiction, compliance_status, etc.) comes from the scenario, not the model.
+2. **[scripts/prompts.py](scripts/prompts.py)** — `build_conversation_prompt(scenario)` renders the recipe plus `_response_requirements()`, which emits explicit scenario-specific instructions (must cross into tier X; must/must not decline; may give permitted general advice but never reference the customer's circumstances). Six distinct requirement shapes exist; all are exercised.
 
-3. **[scripts/generate_conversations.py](scripts/generate_conversations.py)** — for each sampled scenario: calls the model, extracts JSON from the response (`utils.extract_json`, tolerates markdown fences), merges it with the scenario into a full record (`assemble_record`), and validates it (`utils.validate_conversation`). On failure it retries the same scenario up to `--max_retries` times, then drops it and logs why — it does not fall back to a lower-quality record. Appends valid records to the output JSONL as it goes (not batched), so a killed run keeps whatever it already wrote.
+3. **[scripts/generate_conversations.py](scripts/generate_conversations.py)** — calls the model, extracts JSON, merges into a record, derives `policy_categories`, validates, retries the same scenario up to `--max_retries`, else drops it and logs why. Appends as it goes, so a killed run keeps what it wrote.
 
-4. **[scripts/validate_conversations.py](scripts/validate_conversations.py)** — standalone auditor over an existing JSONL file; reuses the same `utils.validate_conversation` check, reports per-record failures and the compliance-status distribution among valid records, and optionally writes a filtered `--output` containing only records that passed.
+4. **[scripts/validate_conversations.py](scripts/validate_conversations.py)** — standalone auditor; same validator, plus breach balance, tier mix, signal coverage and derived-policy-category counts.
 
-### Conversation validation rules
+### The policy rule lives in code
 
-`utils.validate_conversation` (used by both generation-time retries and the standalone auditor) enforces the schema mechanically wherever the spec's QC checklist is checkable without human judgment:
-- `messages` turns are numbered sequentially from 1 and alternate `customer`/`assistant` starting with `customer`.
-- `compliance_status`/`severity`/`difficulty` are valid enum values; `risk_categories` are from `config.RISK_CATEGORIES`.
-- `COMPLIANT` records must have empty `problematic_turns`/`problematic_spans`; `NON_COMPLIANT`/`BORDERLINE` records must have at least one.
-- Every `problematic_spans[].text` must appear as an **exact verbatim substring** of the assistant content in the turn it cites (not a paraphrase) — this is the check most likely to reject otherwise-plausible model output, since models often lightly reword the span instead of copying it.
+[scripts/policy_categories.py](scripts/policy_categories.py) holds the FAG policy as deterministic functions:
 
-### Backend abstraction
+- `expected_breach(advice_tier, product_scope)` — Tier 1 never breaches; Tier 3 always does; **Tier 2 breaches only on Corps Act products** (general advice is permitted, though monitored, on other services). Validation enforces that every record's label agrees, so the corpus is consistent by construction rather than by trusting the model.
+- `derive_policy_categories(record)` — maps signals + context facts onto the 9 booleans production records. These are **derived, never annotated**: they are scope labels rather than descriptions of wrongdoing, they cannot attach to a text span, and several carry no positive examples in production data.
+- `unexplained_breach(record)` — the annotation-gap check (a breach no policy category explains). Validation rejects these.
 
-[scripts/model_backends.py](scripts/model_backends.py) is domain-agnostic: a single `call_model(prompt, max_tokens, temperature)` used by generation, backed by one of three implementations selected via `config.BACKEND` (driven by the `USE_ANTHROPIC` env var):
-- `APIBackend` — OpenAI-compatible HTTP API (local vLLM server mode, `VLLM_API_BASE`).
-- `VLLMDirectBackend` — in-process vLLM (`from vllm import LLM`), only if the `vllm` package is importable.
-- `AnthropicBackend` — Anthropic Messages API via the `anthropic` SDK; reads `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL` from the environment (`config.ANTHROPIC_CONFIG`), only if the `anthropic` package is importable.
+### Validation rules
 
-`setup_model_backend()` must be called once before any `call_model()` calls; it also validates/resolves the served model name against the live API.
+`utils.validate_conversation(record)` enforces:
+- turns numbered sequentially from 1, alternating `customer`/`assistant` from `customer`;
+- label agrees with `expected_breach(tier, scope)`; `severity` set iff breach; `is_corps_question` implies `corps_act`;
+- breach ⇒ ≥1 span, every span's category is in `signal_categories`, **and every declared signal has a span**; non-breach ⇒ empty spans;
+- every span `text` is an **exact verbatim substring** of the cited assistant turn — the check most likely to reject otherwise-plausible output, since models reword spans;
+- `policy_categories` matches the derivation.
+
+### Hard negatives are deliberate
+
+Non-breach records on non-Corps topics may carry `signal_categories` with **empty spans**: advisory language is present, and the correct label is still "no breach" because the scope permits Tier 2. This is what stops a detector collapsing into "recommendation words ⇒ breach". Don't "fix" it by clearing those signals.
 
 ### Domain data lives in config.py
 
-[scripts/config.py](scripts/config.py) is the single source of truth for everything the sampler and prompts draw from: `TOPICS`, `INDUSTRIES`, `BUSINESS_TYPES`, `JURISDICTIONS`, `RISK_CATEGORIES`/`CATEGORY_DESCRIPTIONS`, and all the `*_WEIGHTS`/`*_BUCKETS` distribution knobs. Adding a topic, jurisdiction, or risk category means adding it here — `scenario_sampler.py` and `prompts.py` pick it up automatically with no other code changes. Changing target distributions (e.g. more BORDERLINE examples) means editing the weight dicts here, not the prompt text.
+[scripts/config.py](scripts/config.py) is the single source of truth: `CORPS_ACT_PRODUCT_TOPICS`/`NON_CORPS_ACT_TOPICS`, `ADVICE_TIER_DESCRIPTIONS`, the 15 `SIGNAL_DESCRIPTIONS` and their `GENERAL_`/`PERSONAL_`/`DOMAIN_ADVICE_SIGNALS` groupings (which must partition all 15), `PRODUCTION_POLICY_CATEGORIES`, and every `*_WEIGHTS`/`*_RATE` knob. The 15 signals are the doc's 14 plus `INSURANCE_ADVICE`, which closes a real gap. `business_advice_misleading` is intentionally always `False` — it belongs to the groundedness guardrail.
+
+### Backend abstraction
+
+[scripts/model_backends.py](scripts/model_backends.py) is domain-agnostic: one `call_model(prompt, max_tokens, temperature)` behind `APIBackend` (OpenAI-compatible/vLLM), `VLLMDirectBackend`, `AnthropicBackend`, or MLX, selected via `config.BACKEND`. `setup_model_backend()` must be called once before any `call_model()`.

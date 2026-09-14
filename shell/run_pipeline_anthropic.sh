@@ -11,10 +11,10 @@ shift 2>/dev/null || true
 
 export USE_ANTHROPIC=1
 
-echo "Generating ${COUNT} banking compliance conversations (Anthropic: ${ANTHROPIC_MODEL:-claude-sonnet-5})"
+echo "Generating ${COUNT} FAG conversations (Anthropic: ${ANTHROPIC_MODEL:-claude-sonnet-5})"
 python "${PROJ_DIR}/scripts/generate_conversations.py" --count "${COUNT}" "$@"
 
 python "${PROJ_DIR}/scripts/validate_conversations.py" \
-    --input "${PROJ_DIR}/output/banking_compliance_conversations.jsonl"
+    --input "${PROJ_DIR}/output/vrm_fag_conversations.jsonl"
 
 echo "[done]"
