@@ -112,7 +112,7 @@ sdgf/
 ## M6 — Agentic tools
 
 - [x] Implement sdgf/src/sdgf/tools/registry.py: tools declared once with name, JSON input schema, sensitivity level and read_only flag (default true), with each task listing the tools it may use; tests
-- [ ] Implement sdgf/src/sdgf/tools/cache.py and gateway.py: every tool call goes through the gateway, which enforces the task allowlist, a per-record call and token budget, attaches the tool's sensitivity label to the result, caches responses by tool name plus canonical arguments, and appends every call to the record's tool trace; tests for denial, budget exhaustion, cache hit and trace content
+- [x] Implement sdgf/src/sdgf/tools/cache.py and gateway.py: every tool call goes through the gateway, which enforces the task allowlist, a per-record call and token budget, attaches the tool's sensitivity label to the result, caches responses by tool name plus canonical arguments, and appends every call to the record's tool trace; tests for denial, budget exhaustion, cache hit and trace content
 - [ ] Extend sdgf/src/sdgf/generate/generator.py into an agent loop where the generator backend may return tool calls that are executed via the gateway and fed back until it returns a final record or hits the budget; MockBackend gains scripted tool calls; tests
 - [ ] Implement sdgf/src/sdgf/tools/builtin.py with two safe read-only example tools (a fictional product-catalogue lookup over a local JSON fixture and a calculator) and a test that replays a record exactly from its cached tool trace
 - [ ] M6 checkpoint: run the full suite and write an M6 summary to .ralphy/progress.txt
