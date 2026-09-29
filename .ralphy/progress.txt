@@ -1,0 +1,3 @@
+# Ralphy Progress Log
+
+- [M1.1] Created sdgf/pyproject.toml (src layout, py>=3.11, core deps, extras pii/toxicity/embeddings/retrieval/dev, pytest+ruff config), empty modules per target layout, tests/test_smoke.py; 2 tests pass, ruff clean.
