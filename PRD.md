@@ -81,7 +81,7 @@ sdgf/
 
 ## M3 — Governance
 
-- [ ] Implement sdgf/src/sdgf/governance/profile.py: a global governance profile merged with per-task tightening from spec.governance, where a task may only tighten, never loosen, and documented exceptions must be declared; tests that loosening attempts raise
+- [x] Implement sdgf/src/sdgf/governance/profile.py: a global governance profile merged with per-task tightening from spec.governance, where a task may only tighten, never loosen, and documented exceptions must be declared; tests that loosening attempts raise
 - [ ] Implement sdgf/src/sdgf/governance/pii.py: a regex PII scanner (email, phone, AU ABN, TFN, BSB and account-number patterns, plus per-task patterns from the profile) returning typed findings with spans, and an optional lazily imported Presidio adapter behind the same interface; tests use only fictional values
 - [ ] Implement sdgf/src/sdgf/governance/toxicity.py, secrets.py and entities.py: a keyword-list toxicity baseline plus optional Detoxify adapter, secret and credential patterns (API keys, private keys, tokens), and a real-entity deny and allow list; tests
 - [ ] Implement sdgf/src/sdgf/validate/l3_governance.py: run all governance scanners, apply stricter handling to records whose tool trace carries a sensitive label, and treat every finding as fail_hard (drop, never repair); tests
