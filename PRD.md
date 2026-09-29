@@ -139,4 +139,4 @@ sdgf/
 
 - [x] Implement sdgf/src/sdgf/tasktypes/sft_qa.py: an answer_emergent task type for SFT question-answer pairs with pluggable answer extractors ported from src_original/DS2-Instruct/scripts/utils.py (multiple choice, yes-no-maybe, numeric, boxed math), registered as sft_qa; tests
 - [x] Create sdgf/tasks/cfa/task.yaml and seeds.jsonl porting the DS2-Instruct cfa task (task description, Bloom axis, keyword expansion enabled, K-vote consistency) with 5 fictional seed questions; end-to-end mock test that produces released SFT pairs, proving both generation modes run on the same core
-- [ ] M9 checkpoint: run the full suite and write a final summary to .ralphy/progress.txt listing what is done, what is stubbed (Jev adapter, optional engines) and the open questions from FRAMEWORK_DESIGN.md §16
+- [x] M9 checkpoint: run the full suite and write a final summary to .ralphy/progress.txt listing what is done, what is stubbed (Jev adapter, optional engines) and the open questions from FRAMEWORK_DESIGN.md §16
