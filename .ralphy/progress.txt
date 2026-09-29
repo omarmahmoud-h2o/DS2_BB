@@ -1,3 +1,4 @@
 # Ralphy Progress Log
 
 - [M1.1] Created sdgf/pyproject.toml (src layout, py>=3.11, core deps, extras pii/toxicity/embeddings/retrieval/dev, pytest+ruff config), empty modules per target layout, tests/test_smoke.py; 2 tests pass, ruff clean.
+- [M1.2] Added sdgf/src/sdgf/spec/schema.py: frozen pydantic models for all 12 task.yaml sections (8 required: task, output_schema, rubric, seeds, coverage, models, validation, thresholds; tools/governance/hitl/budget optional), parse_spec() raising SpecValidationError with dotted field paths; cross-checks (L5 needs models.judge, reasons need fallback_judge, layers ordered L1..L6, ≤255 judge choices, balance sums to 1, governance_violations_max pinned to 0). Thresholds are nullable so compile.py can reject unset ones (no silent gate defaults); domain data goes in coverage.params. tests/test_spec_schema.py: 30 tests; suite 32 passed, ruff clean.
