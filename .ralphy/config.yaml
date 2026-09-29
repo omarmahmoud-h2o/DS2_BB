@@ -1,0 +1,45 @@
+# Ralphy Configuration
+# https://github.com/michaelshimeles/ralphy
+# NOTE: rules and boundaries below are injected into the agent's prompt as
+# instructions only — Ralphy does not enforce them, and it runs Claude with
+# --dangerously-skip-permissions.
+
+# Project info
+project:
+  name: "Synthetic Data Generation Framework"
+  language: "Python"
+  framework: ""
+  description: "Generic, governed synthetic-data generation framework (quality, governance, cost). FAG (Financial Advice Guardrail) is the first use case and the pipeline's test suite. Design: FRAMEWORK_DESIGN.md."
+
+# Commands — no test suite exists yet (planned in FRAMEWORK_DESIGN.md §13)
+commands:
+  test: ""
+  lint: ""
+  build: ""
+
+# Rules - instructions the AI MUST follow (injected into every prompt)
+rules:
+  - "Never read, open, or copy ../single_turn_financial_advice.csv or ../multi_turn_financial_advice.csv or any other file outside this repository. They are the user's held-out evaluation set."
+  - "Follow FRAMEWORK_DESIGN.md. Do not reopen decisions listed in its §15 'Decisions made'; flag disagreements in the progress log instead."
+  - "Build the new framework as a separate codebase/package; do not refactor the existing scripts/ FAG pipeline in place."
+  - "Do not reintroduce a compliance_status field; FAG supervises only financial_advice_breach (see CLAUDE.md)."
+  - "Keep BREACH_RATE balanced 50/50; never tune distributions to match any evaluation data."
+  - "Never put real names, account numbers, or other real PII in code, tests, or fixtures. Use obviously fictional values."
+  - "Do not make real paid model API calls in tests; use a mock model backend."
+  - "Do not push to any remote."
+
+# Boundaries - files/folders the AI should not modify
+boundaries:
+  never_touch:
+    - "src_original/**"
+    - "output/**"
+    - "synthetic_conversations.jsonl"
+    - "VRM_Compliance_Definitions_OLD.md"
+    - "VRM_Compliance_Guardrail_Architecture.md"
+    - "Task description.md"
+    - "environment.yml"
+    - ".git/**"
+
+# Capabilities - optional tool integrations
+capabilities:
+  browser: "false"

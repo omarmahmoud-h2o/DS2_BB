@@ -2,3 +2,5 @@
 .vllm.pid
 __pycache__/
 *.pyc
+src_original/
+output/vrm_fag_conversations*.jsonl
