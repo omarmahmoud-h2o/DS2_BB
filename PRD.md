@@ -130,7 +130,7 @@ sdgf/
 
 - [x] Implement sdgf/src/sdgf/hitl/queue.py: a file-based review queue for flagged records (judge disagreement, low confidence) with resolve actions accept, reject and relabel, where resolved items are appended to the task's gold set; plus a coverage-plan approval checkpoint that pauses the pipeline until an approval file exists when spec.hitl enables it; tests
 - [x] Implement sdgf/src/sdgf/cli.py with subcommands validate-spec, plan, run, resume, evaluate, review and release, exposed as the sdgf console script in pyproject.toml; tests using a CliRunner-style subprocess call on the FAG spec with the mock backend
-- [ ] Add concurrency to the pipeline: a bounded thread pool for generation and judge calls with per-stage concurrency set in spec.models, keeping output order-independent and deterministic per seed; tests that concurrent and sequential runs produce the same accepted set with the mock backend
+- [x] Add concurrency to the pipeline: a bounded thread pool for generation and judge calls with per-stage concurrency set in spec.models, keeping output order-independent and deterministic per seed; tests that concurrent and sequential runs produce the same accepted set with the mock backend
 - [ ] Add budget and cost tracking: count tokens and estimated cost per stage from backend responses, stop cleanly and resumably when spec.budget is exhausted, and report cost per accepted record; tests
 - [ ] Write sdgf/README.md: install, the task.yaml reference, how to add a use case (spec plus hooks), running the FAG example with the mock backend, and the list of optional adapters
 - [ ] M8 checkpoint: run the full suite and write an M8 summary to .ralphy/progress.txt
