@@ -63,7 +63,7 @@ sdgf/
 - [x] Create sdgf/tasks/fag/task.yaml porting the FAG domain data from scripts/config.py (Corps and non-Corps topics, tiers, 15 signals and groupings, weights, BREACH_RATE 0.5, length buckets) into the spec schema with task type classification_spans and generation_mode label_first; example thresholds from §8; loading it compiles without errors; test
 - [x] Create sdgf/tasks/fag/hooks.py porting from scripts/policy_categories.py and scripts/scenario_sampler.py: label_rule (expected_breach), sampler_constraints (tier, scope, signals, severity, is_corps_question, denial_present conditioning), post_process (derive_policy_categories); add sdgf/tests/test_fag_parity.py that imports scripts/policy_categories.py via sys.path and asserts identical outputs across all tier, scope and signal combinations
 - [x] Create sdgf/tasks/fag/seeds.jsonl with 6 hand-written, fully fictional FAG seed conversations (3 breach, 3 non-breach including one permitted-general-advice hard negative) that pass the classification_spans schema; do not derive them from any evaluation file; test that seeds load and validate
-- [ ] M1 checkpoint: run the full suite, confirm the FAG spec loads and compiles, and write a short M1 summary with any open concerns to .ralphy/progress.txt
+- [x] M1 checkpoint: run the full suite, confirm the FAG spec loads and compiles, and write a short M1 summary with any open concerns to .ralphy/progress.txt
 
 ## M2 — Scheduler, generation, deterministic validation
 
