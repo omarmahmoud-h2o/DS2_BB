@@ -77,7 +77,7 @@ sdgf/
 - [x] Implement sdgf/src/sdgf/validate/repair.py: on a repairable failure, re-prompt the generator with the original prompt plus the specific validator errors, up to validation.repair_tries, in the same cell; after exhaustion drop with a logged reason per cell and layer; tests showing a MockBackend that fixes its output on the second try is accepted
 - [x] Implement sdgf/src/sdgf/pipeline.py for stages 0, 2 and 3 with L1 and L2 only: compile spec, schedule, generate, validate, repair, write accepted records with provenance and a drop log; end-to-end test running the FAG spec with a MockBackend that returns valid records for 20 records
 - [x] Add sdgf/tests/test_fag_layer_failures.py: hand-built FAG records that each fail exactly one of L1 or L2 (wrong turn order, reworded span, label disagreeing with tier and scope, missing span for a declared signal) and assert the cascade stops at that layer with the expected error
-- [ ] M2 checkpoint: run the full suite, run the FAG end-to-end mock test, and write an M2 summary to .ralphy/progress.txt
+- [x] M2 checkpoint: run the full suite, run the FAG end-to-end mock test, and write an M2 summary to .ralphy/progress.txt
 
 ## M3 — Governance
 
