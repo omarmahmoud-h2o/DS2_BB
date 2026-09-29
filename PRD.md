@@ -124,7 +124,7 @@ sdgf/
 - [x] Implement sdgf/src/sdgf/evaluation/gate.py: compare metrics with spec.thresholds, pass or fail with a list of failing metrics and short cells, where governance violations above zero always fail; tests for pass, fail and hard-fail cases
 - [x] Implement sdgf/src/sdgf/evaluation/reports.py: on pass, write a versioned release directory with the dataset JSONL, a dataset card in markdown, per-record provenance, a governance report listing which external endpoints received data per D12, and a metrics report; on fail, write a shortfall report; tests
 - [x] Wire stages 4 and 5 into the pipeline so a failed gate sends the scheduler back to fill only the short cells, with a max-rounds limit; end-to-end FAG mock test that releases successfully and another that fails then recovers after one extra round
-- [ ] M7 checkpoint: run the full suite and write an M7 summary to .ralphy/progress.txt
+- [x] M7 checkpoint: run the full suite and write an M7 summary to .ralphy/progress.txt
 
 ## M8 — HITL, CLI and optimisation
 
