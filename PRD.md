@@ -87,7 +87,7 @@ sdgf/
 - [x] Implement sdgf/src/sdgf/validate/l3_governance.py: run all governance scanners, apply stricter handling to records whose tool trace carries a sensitive label, and treat every finding as fail_hard (drop, never repair); tests
 - [x] Implement sdgf/src/sdgf/validate/l4_overlap.py: character-shingle Jaccard similarity against seeds and against the accepted corpus so far (near-duplicates), plus an optional held-out check that only runs when an explicit held-out path is passed at run time and never feeds generation; optional embedding adapter; fail_hard above thresholds; tests use synthetic strings only
 - [x] Add the stage 0 seed gate in sdgf/src/sdgf/spec/compile.py: re-scan every seed with the PII and toxicity scanners and refuse to compile if any seed fails; check that listed tools exist in the tool registry and that every release threshold is set; tests
-- [ ] Add L3 and L4 to the pipeline cascade and extend sdgf/tests/test_fag_layer_failures.py with records that fail only L3 (embedded fictional TFN, secret-like token) or only L4 (copied seed, near-duplicate), asserting a hard drop
+- [x] Add L3 and L4 to the pipeline cascade and extend sdgf/tests/test_fag_layer_failures.py with records that fail only L3 (embedded fictional TFN, secret-like token) or only L4 (copied seed, near-duplicate), asserting a hard drop
 - [ ] M3 checkpoint: run the full suite and write an M3 summary to .ralphy/progress.txt
 
 ## M4 — Judge and consistency
