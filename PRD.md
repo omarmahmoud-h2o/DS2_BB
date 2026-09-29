@@ -99,7 +99,7 @@ sdgf/
 - [x] Implement sdgf/src/sdgf/validate/l6_consistency.py: run only on escalated records (contestable, hard, low confidence); with a judge whose calibration passed, use its confidence; otherwise run K votes, where label_first requires the majority to match the fixed label and answer_emergent makes the majority the answer; count unparseable votes as abstentions, fixing the §12.1 None-in-denominator bug; tests
 - [x] Implement sdgf/src/sdgf/judge/calibration.py: given a gold set of human labels, compute Cohen's kappa and expected calibration error with reliability bins, and persist a calibration result per judge model and spec_version that L5 and L6 read to decide trust; tests with known small examples
 - [x] Add a FAG test: a non-breach record whose assistant turn contains advice wording (for example, ideal for your business) passes L1 to L4 and is caught at L5 by a MockBackend judge that returns breach, proving the §12.2 blind spot is closed
-- [ ] M4 checkpoint: run the full suite and write an M4 summary to .ralphy/progress.txt
+- [x] M4 checkpoint: run the full suite and write an M4 summary to .ralphy/progress.txt
 
 ## M5 — Coverage planning
 
