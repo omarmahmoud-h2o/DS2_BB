@@ -4,3 +4,9 @@ __pycache__/
 *.pyc
 src_original/
 output/vrm_fag_conversations*.jsonl
+
+# sdgf local artefacts
+sdgf/src/*.egg-info/
+sdgf/tasks/*/data/
+# notebooks hold local API keys and run outputs
+sdgf/examples/*.ipynb
