@@ -23,7 +23,7 @@ Status: **open, in progress.**
 ## Tasks
 
 - [x] Add per-vote diversity for label_first L6: a `validation.consistency` section (or extend `consistency_k`) with `temperatures` (cycled per vote, default `[0.7, 0.8, 0.9]` to match `BackendAnswerer`) and an optional `models.consistency_judge` stage so votes can come from a different model than L5; L6 builds its own judge from these instead of reusing `self.judge`; tests with a MockBackend that returns different verdicts per temperature, proving votes differ and the majority is computed over them
-- [ ] Decide and document whether a temperature-0 judge with no diversity configured should warn at stage 0 (K identical votes) or be rejected when `consistency_k > 1`; implement the chosen behaviour with a test
+- [x] Decide and document whether a temperature-0 judge with no diversity configured should warn at stage 0 (K identical votes) or be rejected when `consistency_k > 1`; implement the chosen behaviour with a test
 - [ ] Record per-vote model and temperature in L6 details and provenance, so vote agreement can be analysed after a run
 - [ ] Add an optional `rubric.judge_context` (string) used as the judge's `## Context` instead of `task.description`; fall back to `task.description` when unset so FAG and CFA are unchanged; tests that the generation prompt and the judge prompt get their own text and that the label still never appears in the judge prompt
 - [ ] Allow judge-only worked examples (`rubric.examples`: record view + expected verdict, fictional only, scanned for PII at stage 0 like seeds); render them in the judge's static prefix; tests
