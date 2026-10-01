@@ -28,5 +28,5 @@ Status: **open, in progress.**
 - [x] Add an optional `rubric.judge_context` (string) used as the judge's `## Context` instead of `task.description`; fall back to `task.description` when unset so FAG and CFA are unchanged; tests that the generation prompt and the judge prompt get their own text and that the label still never appears in the judge prompt
 - [x] Allow judge-only worked examples (`rubric.examples`: record view + expected verdict, fictional only, scanned for PII at stage 0 like seeds); render them in the judge's static prefix; tests
 - [x] Write `judge_context` for `sdgf/tasks/groundness`: support levels, category minimums and the rubric's worked examples, without generator instructions
-- [ ] Update `sdgf/docs/framework.md` (L5 and L6 sections) and the README `rubric` / `validation` reference for the new keys
+- [x] Update `sdgf/docs/framework.md` (L5 and L6 sections) and the README `rubric` / `validation` reference for the new keys
 - [ ] Checkpoint: full suite passes; a mock groundness run shows L6 votes that differ across temperatures
