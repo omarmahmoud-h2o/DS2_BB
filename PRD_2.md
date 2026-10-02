@@ -2,7 +2,7 @@
 
 Follow-up work found while setting up the groundness task (`sdgf/tasks/groundness`). The guardrails and conventions in [PRD.md](PRD.md) apply unchanged; section numbers (§) refer to FRAMEWORK_DESIGN.md.
 
-Status: **open, in progress.**
+Status: **done.**
 
 ## Problem 1 — L6 votes in label_first are not independent
 
@@ -29,4 +29,4 @@ Status: **open, in progress.**
 - [x] Allow judge-only worked examples (`rubric.examples`: record view + expected verdict, fictional only, scanned for PII at stage 0 like seeds); render them in the judge's static prefix; tests
 - [x] Write `judge_context` for `sdgf/tasks/groundness`: support levels, category minimums and the rubric's worked examples, without generator instructions
 - [x] Update `sdgf/docs/framework.md` (L5 and L6 sections) and the README `rubric` / `validation` reference for the new keys
-- [ ] Checkpoint: full suite passes; a mock groundness run shows L6 votes that differ across temperatures
+- [x] Checkpoint: full suite passes; a mock groundness run shows L6 votes that differ across temperatures
