@@ -8,5 +8,7 @@ output/vrm_fag_conversations*.jsonl
 # sdgf local artefacts
 sdgf/src/*.egg-info/
 sdgf/tasks/*/data/
+# built from tasks/groundness (production-derived); local only, like the task itself
+sdgf/tests/fixtures/groundness/
 # notebooks hold local API keys and run outputs
 sdgf/examples/*.ipynb
