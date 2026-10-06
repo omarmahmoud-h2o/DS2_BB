@@ -12,3 +12,5 @@ sdgf/tasks/*/data/
 sdgf/tests/fixtures/groundness/
 # notebooks hold local API keys and run outputs
 sdgf/examples/*.ipynb
+# sdgf.stress output (python -m sdgf.stress writes it where it runs)
+stress_report.md
