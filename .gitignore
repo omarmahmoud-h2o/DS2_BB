@@ -14,3 +14,7 @@ sdgf/tests/fixtures/groundness/
 sdgf/examples/*.ipynb
 # sdgf.stress output (python -m sdgf.stress writes it where it runs)
 stress_report.md
+
+# production-derived task and diagram tool output; local only
+sdgf/tasks/groundness/
+sdgf/.archify/
